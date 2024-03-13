@@ -15,6 +15,7 @@
     <one-to-one name="image" ref="com.axelor.meta.db.MetaFile" />
     <string name="notes" large="true" />
     <string name="attrs" title="Attributes" json="true" />
+    <string name="updateType" selection="product.update.selection"/>
   </entity>
 
 </domain-models>

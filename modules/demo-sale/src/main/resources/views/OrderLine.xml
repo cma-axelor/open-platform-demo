@@ -3,18 +3,29 @@
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="http://axelor.com/xml/ns/object-views https://axelor.com/xml/ns/object-views/object-views_6.1.xsd">
 
-  <grid name="order-line-grid" title="Ordered Items" model="com.axelor.sale.db.OrderLine">
-    <field name="order" />
-    <field name="product" onChange="action-order-line-change-product"/>
-    <field name="price" />
-    <field name="quantity" />
+  <grid name="order-line-grid" title="Ordered Items" model="com.axelor.sale.db.OrderLine" expandable="true" editable="true" expandable-form-view="order-line-form-nested">
+    <field name="product" onChange="action-order-line-change-product,action-order-line-change-compute"/>
+    <field name="price" onChange="action-order-line-change-compute"/>
+    <field name="quantity" onChange="action-order-line-change-compute"/>
+    <field name="totalPrice" readonly="true"/>
   </grid>
 
   <form name="order-line-form" title="Ordered Item" model="com.axelor.sale.db.OrderLine">
     <panel title="Overview">
-      <field name="product" colSpan="12" onChange="action-order-line-change-product"/>
-      <field name="price" />
-      <field name="quantity" />
+      <field name="product" colSpan="12" onChange="action-order-line-change-product,action-order-line-change-compute"/>
+      <field name="price" onChange="action-order-line-change-compute"/>
+      <field name="quantity" onChange="action-order-line-change-compute"/>
+      <field name="oldQty" hidden="true"/>
+      <field name="oldPrice" hidden="true"/>
+    <panel-related
+        field="items"
+        editable="true"
+        x-expandable="true"
+        x-expandable-form="order-line-form-nested"
+        grid-view="order-line-grid"
+        form-view="order-line-form"
+        colSpan="12"
+    />
     </panel>
     <panel-related field="taxes">
       <field name="name" />
@@ -22,8 +33,30 @@
     </panel-related>
   </form>
 
+    <form name="order-line-form-nested" title="Ordered Item" model="com.axelor.sale.db.OrderLine">
+    <panel-related
+        field="items"
+        editable="true"
+        x-display-mode="tree"
+        x-expandable="true"
+        x-expandable-form="order-line-form"
+        grid-view="order-line-grid"
+        form-view="order-line-form"
+        colSpan="12"
+    />
+  </form>
+
   <action-record name="action-order-line-change-product" model="com.axelor.sale.db.OrderLine">
     <field name="price" expr="eval: product.price ? product.price : 0.00" if="product"/>
+    <field name="quantity" expr="eval: 1"/>
   </action-record>
+
+  <action-record name="action-order-line-change-compute" model="com.axelor.sale.db.OrderLine">
+    <field name="totalPrice" expr="eval: price * quantity"/>
+  </action-record>
+
+  <action-method name="action-order-line-method-onchange">
+    <call class="com.axelor.sale.web.SaleOrderLineController" method="onLineChange"/>
+  </action-method>
 
 </object-views>

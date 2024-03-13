@@ -35,6 +35,7 @@
         <field name="code"/>
         <field name="color" widget="SingleSelect"/>
         <field name="category"/>
+        <field name="updateType"/>
       </panel>
     </panel>
     <panel title="Attributes" itemSpan="12">
@@ -45,4 +46,8 @@
     </panel>
   </form>
 
+  <selection name="product.update.selection">
+    <option value="parent">Parent</option>
+    <option value="children">Children</option>
+  </selection>
 </object-views>
