@@ -29,7 +29,6 @@ import com.axelor.rpc.ActionResponse;
 import com.axelor.sale.db.Order;
 import com.axelor.sale.db.OrderLine;
 import com.axelor.sale.db.OrderStatus;
-import com.axelor.sale.db.repo.OrderLineRepository;
 import com.axelor.sale.service.SaleOrderService;
 import com.google.common.collect.Lists;
 import java.math.BigDecimal;
@@ -181,196 +180,25 @@ public class SaleOrderController extends JpaSupport {
   @SuppressWarnings("unchecked")
   public void onLineChange(ActionRequest request, ActionResponse response) {
     Map<String, Object> context = request.getRawContext();
-    OrderLine dirtyLine = getDirtyLine((List<Map<String, Object>>) context.get("items"));
+    if (context.get("items") == null) {
+      return;
+    }
+    SaleOrderService orderService = Beans.get(SaleOrderService.class);
+    OrderLine dirtyLine =
+        orderService.findDirtyLine((List<Map<String, Object>>) context.get("items"));
     if (dirtyLine == null) {
       return;
     }
     Order order = request.getContext().asType(Order.class);
-    List<OrderLine> items = order.getItems();
-    if (items == null) {
-      return;
-    }
-    updateChild(dirtyLine);
-    replaceDirtyLineInItems(dirtyLine, items);
-    updateParent(dirtyLine, items);
+    List<OrderLine> items = orderService.updateRelatedLines(dirtyLine, order);
 
     response.setValue(
         "items", items.stream().map(this::toMapWithSubLine).collect(Collectors.toList()));
   }
 
-  private void print(List<OrderLine> items) {
-    if (items == null) {
-      return;
-    }
-    for (OrderLine orderLine : items) {
-      System.err.println(orderLine);
-      print(orderLine.getItems());
-    }
-  }
-
-  private boolean replaceDirtyLineInItems(OrderLine dirtyLine, List<OrderLine> items) {
-    if (items == null) {
-      return false;
-    }
-
-    int i = 0;
-    for (OrderLine orderLine : items) {
-      if (isEqual(orderLine, dirtyLine)) {
-        items.set(i, dirtyLine);
-        return true;
-      }
-      if (orderLine.getItems() != null
-          && replaceDirtyLineInItems(dirtyLine, orderLine.getItems())) {
-        return true;
-      }
-      i++;
-    }
-    return false;
-  }
-
-  private void updateChild(OrderLine line) {
-    List<OrderLine> items = line.getItems();
-    BigDecimal qtyCoef = getQtyCoef(line);
-    BigDecimal priceCoef = getPriceCoef(line);
-    if (ObjectUtils.isEmpty(items)
-        || (BigDecimal.ONE.compareTo(qtyCoef) == 0 && BigDecimal.ONE.compareTo(priceCoef) == 0)) {
-      return;
-    }
-    for (OrderLine orderLine : items) {
-      updateValues(orderLine, qtyCoef, priceCoef);
-    }
-  }
-
-  protected BigDecimal getPriceCoef(OrderLine line) {
-    BigDecimal oldPrice = line.getOldPrice();
-    if (oldPrice.signum() == 0) {
-      return BigDecimal.ONE;
-    }
-    return line.getPrice().divide(oldPrice, 4, RoundingMode.HALF_EVEN);
-  }
-
-  protected BigDecimal getQtyCoef(OrderLine line) {
-    if (line.getOldQty() == 0) {
-      return BigDecimal.ONE;
-    }
-    return BigDecimal.valueOf(line.getQuantity())
-        .divide(BigDecimal.valueOf(line.getOldQty()), 4, RoundingMode.HALF_EVEN);
-  }
-
-  private void updateParent(OrderLine dirtyLine, List<OrderLine> list) {
-    for (OrderLine orderLine : list) {
-      if (isOrHasDirtyLine(orderLine, dirtyLine)) {
-        compute(orderLine);
-      }
-    }
-  }
-
-  private void compute(OrderLine orderLine) {
-    List<OrderLine> items = orderLine.getItems();
-    if (ObjectUtils.isEmpty(items)) {
-      return;
-    }
-    Integer quantity = orderLine.getQuantity();
-    BigDecimal totalPrice = BigDecimal.ZERO;
-    for (OrderLine line : items) {
-      compute(line);
-      totalPrice = totalPrice.add(line.getTotalPrice());
-    }
-    totalPrice = quantity == 0 ? BigDecimal.ZERO : totalPrice;
-    BigDecimal price =
-        quantity == 0
-            ? BigDecimal.ZERO
-            : totalPrice.divide(BigDecimal.valueOf(quantity), 4, RoundingMode.HALF_EVEN);
-    orderLine.setPrice(price);
-    orderLine.setTotalPrice(totalPrice);
-  }
-
-  private boolean isOrHasDirtyLine(OrderLine orderLine, OrderLine dirtyLine) {
-
-    if (isEqual(orderLine, dirtyLine)) {
-      return true;
-    }
-    if (orderLine.getItems() == null) {
-      return false;
-    }
-
-    List<OrderLine> items = orderLine.getItems();
-    if (orderLine.getId() != null && items == null) {
-      List<OrderLine> list =
-          Beans.get(OrderLineRepository.class).find(orderLine.getId()).getItems();
-      if (list != null) {
-        items = list;
-      }
-    }
-
-    for (OrderLine line : items) {
-      if (isOrHasDirtyLine(line, dirtyLine)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  private void updateValues(OrderLine orderLine, BigDecimal qtyCoef, BigDecimal priceCoef) {
-    updateQty(orderLine, qtyCoef);
-    updatePrice(orderLine, priceCoef);
-    orderLine.setTotalPrice(
-        BigDecimal.valueOf(orderLine.getQuantity()).multiply(orderLine.getPrice()));
-    List<OrderLine> items = orderLine.getItems();
-    if (ObjectUtils.isEmpty(items)) {
-      return;
-    }
-    for (OrderLine line : items) {
-      updateValues(line, qtyCoef, priceCoef);
-    }
-  }
-
-  protected void updateQty(OrderLine orderLine, BigDecimal qtyCoef) {
-    BigDecimal qty = BigDecimal.valueOf(orderLine.getQuantity());
-    BigDecimal newQty = qtyCoef.multiply(qty).setScale(0, RoundingMode.HALF_EVEN);
-    int newQtyInt = newQty.intValue();
-    orderLine.setQuantity(newQtyInt);
-  }
-
-  protected void updatePrice(OrderLine orderLine, BigDecimal priceCoef) {
-    BigDecimal newPrice =
-        priceCoef.multiply(orderLine.getPrice()).setScale(4, RoundingMode.HALF_EVEN);
-    orderLine.setPrice(newPrice);
-  }
-
-  @SuppressWarnings("unchecked")
-  protected OrderLine getDirtyLine(List<Map<String, Object>> list) {
-    if (list == null) {
-      return null;
-    }
-    for (Map<String, Object> orderLine : list) {
-      Object items = orderLine.get("items");
-      if (isChanged(orderLine)) {
-        OrderLine bean = Mapper.toBean(OrderLine.class, orderLine);
-        if (bean.getId() != null && bean.getItems() == null) {
-          OrderLine line2 = Beans.get(OrderLineRepository.class).find(bean.getId());
-          bean.setItems(line2.getItems());
-        }
-        return bean;
-      }
-      if (items == null) {
-        continue;
-      }
-      OrderLine dirtyLine = getDirtyLine((List<Map<String, Object>>) items);
-      if (dirtyLine != null) {
-        return dirtyLine;
-      }
-    }
-    return null;
-  }
-
-  protected boolean isChanged(Map<String, Object> isChanged) {
-    return Boolean.TRUE.equals(isChanged.get("_changed"));
-  }
-
   public Map<String, Object> toMapWithSubLine(OrderLine line) {
     List<OrderLine> subSoLineList = line.getItems();
-    Map<String, Object> map = toMap(line);
+    Map<String, Object> map = Mapper.toMap(line);
     if (CollectionUtils.isEmpty(subSoLineList)) {
       return map;
     }
@@ -380,19 +208,5 @@ public class SaleOrderController extends JpaSupport {
     }
     map.put("items", subSoLineMapList);
     return map;
-  }
-
-  protected Map<String, Object> toMap(OrderLine line) {
-    Map<String, Object> map = Mapper.toMap(line);
-    map.put("oldQty", line.getQuantity());
-    map.put("oldPrice", line.getPrice());
-    return map;
-  }
-
-  protected boolean isEqual(OrderLine a, OrderLine b) {
-    boolean isId = b.getId() != null && a.getId() != null;
-    return isId
-        ? a.getId().equals(b.getId())
-        : (a.getCid() != null && a.getCid().equals(b.getCid()));
   }
 }

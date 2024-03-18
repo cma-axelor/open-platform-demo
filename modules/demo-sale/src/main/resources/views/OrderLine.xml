@@ -3,7 +3,7 @@
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="http://axelor.com/xml/ns/object-views https://axelor.com/xml/ns/object-views/object-views_6.1.xsd">
 
-  <grid name="order-line-grid" title="Ordered Items" model="com.axelor.sale.db.OrderLine" expandable="true" editable="true" expandable-form-view="order-line-form-nested">
+  <grid name="order-line-grid" title="Ordered Items" model="com.axelor.sale.db.OrderLine" expandable="true" editable="true" x-expand-all="items" expandable-form-view="order-line-form-nested">
     <field name="product" onChange="action-order-line-change-product,action-order-line-change-compute"/>
     <field name="price" onChange="action-order-line-change-compute"/>
     <field name="quantity" onChange="action-order-line-change-compute"/>
@@ -15,8 +15,6 @@
       <field name="product" colSpan="12" onChange="action-order-line-change-product,action-order-line-change-compute"/>
       <field name="price" onChange="action-order-line-change-compute"/>
       <field name="quantity" onChange="action-order-line-change-compute"/>
-      <field name="oldQty" hidden="true"/>
-      <field name="oldPrice" hidden="true"/>
     <panel-related
         field="items"
         editable="true"
@@ -37,9 +35,11 @@
     <panel-related
         field="items"
         editable="true"
-        x-display-mode="tree"
+        x-show-header="false"
         x-expandable="true"
         x-expandable-form="order-line-form"
+        x-expand-all="items"
+        x-display-mode="tree"
         grid-view="order-line-grid"
         form-view="order-line-form"
         colSpan="12"

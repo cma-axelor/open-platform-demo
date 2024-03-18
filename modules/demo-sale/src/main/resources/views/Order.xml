@@ -43,6 +43,8 @@
         onChange="action-order-method-line-onchange,com.axelor.sale.web.SaleOrderController:calculate"
         x-expandable="true"
         x-widget="CollectionTree"
+        x-display-mode="tree"
+       	x-expand-all="items"
         form-view="order-line-form"
         grid-view="order-line-grid"
       />
@@ -205,8 +207,6 @@
     <field name="price" expr="100.0"/>
     <field name="quantity" expr="1"/>
     <field name="taxes" expr="action:default-tax-record"/>
-    <field name="oldQty" expr="1"/>
-    <field name="oldPrice" expr="100.0"/>
     <field name="totalPrice" expr="100.0"/>
   </action-record>
 
